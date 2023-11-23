@@ -1,6 +1,6 @@
 import streamlit as st
 import sqlite3
-
+from pathlib import Path
 
 # Connect to the SQLite database
 conn = sqlite3.connect("forum_database.db")
@@ -12,8 +12,10 @@ cursor.execute('''CREATE TABLE IF NOT EXISTS users
 
 cursor.execute('''CREATE TABLE IF NOT EXISTS topics
                 (id INTEGER PRIMARY KEY, title TEXT, content TEXT, author TEXT)''')
-                
-from pathlib import Path
+   
+cursor.execute('''CREATE TABLE IF NOT EXISTS replies
+                (id INTEGER PRIMARY KEY, topic_id INTEGER, reply TEXT,author TEXT)''')             
+
 
 filename = "flag.txt"  # Replace with the name of the file you want to check
 file_path = Path(filename)
@@ -70,7 +72,36 @@ def create_topic():
         conn.commit()
         st.success("Topic created successfully.")
 
-# List and view discussion topics
+
+
+# ... (previous code)
+
+def reply_to_topic(topic_id):
+    st.subheader("Reply to Topic")
+    author_key = f"AuthorName_{topic_id}"
+    reply_key = f"ReplyContent_{topic_id}"
+    
+    author = st.text_input("Author Name", key=author_key)
+    reply_content = st.text_area("Your Reply", key=reply_key)
+
+    if st.button(f"Submit Reply_{topic_id}"):
+        cursor.execute("INSERT INTO replies (topic_id, reply, author) VALUES (?, ?, ?)", (topic_id, reply_content, author))
+        conn.commit()
+        st.success("Reply posted successfully.")
+
+def view_replies(topic_id):
+    st.subheader("Replies to the Topic")
+    cursor.execute("SELECT * FROM replies WHERE topic_id = ?", (topic_id,))
+    replies = cursor.fetchall()
+
+    if not replies:
+        st.error("No replies for this topic yet.")
+    else:
+        for reply in replies:
+            st.write(f"Author: {reply[3]}")
+            st.write(reply[2])
+            st.write("---")
+
 def view_topics():
     st.subheader("Discussion Topics")
     cursor.execute("SELECT * FROM topics")
@@ -84,7 +115,28 @@ def view_topics():
             st.write(f"**{topic[1]}**")
             st.write(f"Author: {topic[3]}")
             st.write(topic[2])
+
+            # Add a "Reply" button for each topic
+            reply_button_key = f"Reply_{topic[0]}"
+            reply_form_key = f"ReplyForm_{topic[0]}"
+            
+            # Button to toggle visibility of reply form
+            if st.button(f"Reply to Topic #{topic[0]}", key=reply_button_key):
+                st.session_state[reply_form_key] = not st.session_state.get(reply_form_key, False)
+
+            # Display reply form if the button is clicked
+            if st.session_state.get(reply_form_key, False):
+                reply_to_topic(topic[0])
+
+            # Display replies
+            view_replies(topic[0])
+
             st.write("---")
+
+# ... (remaining code)
+
+
+
 
 # Main application
 def option(selected_option):
